@@ -55,15 +55,42 @@ class QuotesEndpoint extends Endpoint {
             array_key_exists("author_id", $context->params) &&
             array_key_exists("category_id", $context->params)
         ) {
-            $result = $server->db->prep_query(
-                "quotes",
-                "insert",
-                array(
-                    "quote" => $context->params["quote"],
-                    "author_id" => $context->params["author_id"],
-                    "category_id" => $context->params["category_id"]
-                )
-            );
+            try {
+                $result = $server->db->prep_query(
+                    "quotes",
+                    "insert",
+                    array(
+                        "quote" => $context->params["quote"],
+                        "author_id" => $context->params["author_id"],
+                        "category_id" => $context->params["category_id"]
+                    )
+                );
+            } catch (Exception $e) {
+                $sub_result = $server->db->prep_query(
+                    "authors",
+                    "select_id",
+                    array(
+                        "id" => $context->params["author_id"]
+                    )
+                );
+
+                if (count($sub_result) === 0) {
+                    return $this->get_message_response(404, "author_id Not Found");
+                }
+
+                $sub_result = $server->db->prep_query(
+                    "categories",
+                    "select_id",
+                    array(
+                        "id" => $context->params["category_id"]
+                    )
+                );
+
+                if (count($sub_result) === 0) {
+                    return $this->get_message_response(404, "category_id Not Found");
+                }
+                
+            }
 
             if (count($result) > 0) {
                 return new Response(body: json_encode($result[0]));
@@ -84,22 +111,67 @@ class QuotesEndpoint extends Endpoint {
             array_key_exists("author_id", $context->params) &&
             array_key_exists("category_id", $context->params)
         ) {
-            $result = $server->db->prep_query(
-                "quotes",
-                "update",
-                array(
-                    "id" => $context->params["id"],
-                    "quote" => $context->params["quote"],
-                    "author_id" => $context->params["author_id"],
-                    "category_id" => $context->params["category_id"]
-                )
-            );
+            try {
+                $sub_result = $server->db->prep_query(
+                    "quotes",
+                    "select_id",
+                    array(
+                        "id" => $context->params["id"]
+                    )
+                );
+
+                if (count($sub_result) === 0) {
+                    return $this->get_message_response(404, "No Quotes Found");
+                }
+
+            } catch (Exception $e) {
+                    return this->get_message_response(500, $e->getMessage());
+            }
+
+            try {
+                $result = $server->db->prep_query(
+                    "quotes",
+                    "update",
+                    array(
+                        "id" => $context->params["id"],
+                        "quote" => $context->params["quote"],
+                        "author_id" => $context->params["author_id"],
+                        "category_id" => $context->params["category_id"]
+                    )
+                );
+            } catch (Exception $e) {
+
+                $sub_result = $server->db->prep_query(
+                    "authors",
+                    "select_id",
+                    array(
+                        "id" => $context->params["author_id"]
+                    )
+                );
+
+                if (count($sub_result) === 0) {
+                    return $this->get_message_response(404, "author_id Not Found");
+                }
+
+                $sub_result = $server->db->prep_query(
+                    "categories",
+                    "select_id",
+                    array(
+                        "id" => $context->params["category_id"]
+                    )
+                );
+
+                if (count($sub_result) === 0) {
+                    return $this->get_message_response(404, "category_id Not Found");
+                }
+                
+            }
 
             if (count($result) > 0) {
                 return new Response(body: json_encode($result[0]));
             }
 
-            return $this->get_message_response(500, "Error while inserting quote");
+            return $this->get_message_response(500, "Error while updating quote");
 
         } else {
             return $this->get_message_response(422, "Missing Required Parameters");
