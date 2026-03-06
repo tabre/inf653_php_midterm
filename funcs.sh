@@ -48,28 +48,58 @@ authors_insert() {
     local -A args=(
         [author]="$1"
     )
-    curl -X POST $(get_url "authors" args)
+    curl -s -X POST $(get_url "authors" args)
 }
 
 authors_select() {
     local -A args=(
         [author]="$1"
     )
-    curl -s $(get_url "authors" args)
+    curl -s -X GET $(get_url "authors" args)
+}
+
+authors_update() {
+    local -A args=(
+        [id]="$1"
+        [author]="$2"
+    )
+    curl -s -X PUT $(get_url "authors" args)
+}
+
+authors_delete() {
+    local -A args=(
+        [id]="$1"
+    )
+    curl -s -X DELETE $(get_url "authors" args)
 }
 
 categories_insert() {
     local -A args=(
         [category]="$1"
     )
-    curl -X POST $(get_url "categories" args)
+    curl -s -X POST $(get_url "categories" args)
 }
 
 categories_select() {
     local -A args=(
         [category]="$1"
     )
-    curl -s $(get_url "categories" args)
+    curl -s -X GET $(get_url "categories" args)
+}
+
+categories_update() {
+    local -A args=(
+        [id]="$1"
+        [category]="$2"
+    )
+    curl -s -X PUT $(get_url "categories" args)
+}
+
+categories_delete() {
+    local -A args=(
+        [id]="$1"
+    )
+    curl -s -X DELETE $(get_url "categories" args)
 }
 
 quotes_insert() {
@@ -83,4 +113,11 @@ quotes_insert() {
         [quote]="$(jq -r '.quote' <<< "$q")"
     )
     curl -X POST $(get_url "quotes" args)
+}
+
+quotes_delete() {
+    local -A args=(
+        [id]="$1"
+    )
+    curl -s -X DELETE $(get_url "quotes" args)
 }
