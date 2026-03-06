@@ -1,10 +1,5 @@
 #!/bin/bash
-
-host="localhost"
-port="8080"
-base_url="http://${host}:${port}/api"
-data_file="quotesdb.json"
-
+source cfg.sh
 source funcs.sh
 
 authors_populate() {
