@@ -1,4 +1,27 @@
 #!/bin/bash
+
+json_valid() {
+    local json="$1"
+    jq -e . >/dev/null 2>&1 <<<"$json"
+}
+
+json_has_fields() {
+    local json="$1"
+    local -n local_fields="$2"
+
+    if ! json_valid "${json}"; then
+        return 1
+    fi
+
+    for field in "${local_fields[@]}"; do
+        if ! jq -e --arg field "$field" 'has($field)' >/dev/null 2>&1 <<<"$json"; then
+            return 1
+        fi
+    done
+
+    return 0
+}
+
 urlencode() {
     local string="$1"
     local encoded=""
@@ -31,8 +54,8 @@ get_url() {
         local -n local_args=$2
         url="${url}?"
 
-        for key in "${!args[@]}"; do
-            val=$(urlencode "${args[$key]}")
+        for key in "${!local_args[@]}"; do
+            val=$(urlencode "${local_args[$key]}")
             url="${url}${key}=${val}&"
         done
     fi
@@ -53,7 +76,7 @@ authors_insert() {
 
 authors_select() {
     local -A args=(
-        [author]="$1"
+        [id]="$1"
     )
     curl -s -X GET $(get_url "authors" args)
 }
@@ -82,7 +105,7 @@ categories_insert() {
 
 categories_select() {
     local -A args=(
-        [category]="$1"
+        [id]="$1"
     )
     curl -s -X GET $(get_url "categories" args)
 }
