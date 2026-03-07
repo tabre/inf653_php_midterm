@@ -131,10 +131,11 @@ quotes_insert() {
     local category="$(jq -r '.category' <<< "$q")"
 
     local -A args=(
-        [author_id]="$(jq -r --arg author "$author" '.[] | select(.author == $author) | .id' <<< $(authors_select))"
-        [category_id]="$(jq -r --arg category "$category" '.[] | select(.category == $category) | .id' <<< $(categories_select))"
+        [author_id]="$(jq -r --arg author "$author" '.[] | select(.author == $author) | .id' <<< $(curl -s -X GET $(get_url "authors")))"
+        [category_id]="$(jq -r --arg category "$category" '.[] | select(.category == $category) | .id' <<< $(curl -s -X GET $(get_url "categories")))"
         [quote]="$(jq -r '.quote' <<< "$q")"
     )
+
     curl -X POST $(get_url "quotes" args)
 }
 
