@@ -147,7 +147,7 @@ quotes_post__422_missing_params() {
         echo -e "\tValid JSON message for 422 response"
         return 0
     else
-        echo -e "\t${status}\n\t${body}\n\tStatus not 422, invalid JSON, or missing fields, or incorrect message"
+        echo -e "\t${status}\n\t${body}\n\tStatus not 422 or incorrect message"
         return 1
     fi
 }
@@ -446,7 +446,7 @@ quotes_put__422_missing_params() {
         echo -e "\tValid JSON message for 422 response"
         return 0
     else
-        echo -e "\t${status}\n\t${body}\n\tStatus not 422, invalid JSON, or missing fields, or incorrect message"
+        echo -e "\t${status}\n\t${body}\n\tStatus not 422 or incorrect message"
         return 1
     fi
 }
@@ -525,7 +525,7 @@ quotes_delete__422_missing_params() {
         echo -e "\tValid JSON 422 message"
         return 0
     else
-        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 422, invalid JSON, or wrong message"
+        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 422 or wrong message"
         return 1
     fi
 }
@@ -539,34 +539,266 @@ quotes_delete__422_missing_params() {
 # Create (POST) ..............................................................
 #
 #   - /authors/ created author (id, author)
+authors_post__valid_fields() {
+    local -A args=(
+        [author]="Boe Jiden"
+    )
+    local url=$(get_url "authors" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X POST -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local id=$(echo "$body" | jq -r '.id')
+
+    authors_delete $id >>/dev/null
+
+    fields=("id" "author")
+    
+    if [[ "$status" == "200" ]] && json_has_fields "$body" fields; then
+        echo -e "\tValid JSON for 200 response"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 200, invalid JSON, or missing fields"
+        return 1
+    fi
+}
 
 #   -If missing any parameters { message: ‘Missing Required Parameters’ }
+authors_post__422_missing_params() {
+    local url=$(get_url "authors")
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X POST -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="Missing Required Parameters"
+    
+    if [[ "$status" == "422" ]] && [[ "$message" == "$expected" ]]; then
+        echo -e "\tValid JSON message for 422 response"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 422 or wrong message"
+        return 1
+    fi
+}
 
 #
 # Read (GET) .................................................................
 #
+
 #   - /authors/ All authors with their id
 #     Expect >= 5 items returned in array
+authors_get__all_returned() {
+    local url=$(get_url "authors")
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X GET -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local count=$(echo "$body" | jq 'length')
+    local expected=5
+    
+    if [[ "$status" == "200" ]] && [[ $count -ge $expected ]]; then
+        echo -e "\tValid JSON response with >=5 results"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tCount: ${count}\n\tStatus not 200, invalid JSON, or less than 5 results returned"
+        return 1
+    fi
+}
 
 #   - /authors/?id=5 The specific author with their id
+authors_get__by_id() {
+    local -A args=(
+        [id]="5"
+    )
+    local url=$(get_url "authors" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X GET -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local id=$(echo "$body" | jq -r '.id')
+    local expected=5
+    
+    if [[ "$status" == "200" ]] && [[ $id == $expected ]]; then
+        echo -e "\tValid JSON response with correct id"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 200, invalid JSON, or wrong id returned"
+        return 1
+    fi
+}
 
 #   - If no authors found for routes above { message: ‘author_id Not Found’ }
+authors_get__404_id() {
+    local -A args=(
+        [id]="42069"  # ID must not exist
+    )
+    local url=$(get_url "authors" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X GET -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="author_id Not Found"
+    
+    if [[ "$status" == "404" ]] && [[ $message == $expected ]]; then
+        echo -e "\tValid JSON response with correct message"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 404 or wrong message"
+        return 1
+    fi
+}
 
 #
 # Update (PUT) ...............................................................
 #
+
 #   - /authors/ updated author (id, author)
+authors_put__valid_fields() {
+    local -A args=(
+        [id]="1"
+        [author]="Boe Jiden"
+    )
+    local url=$(get_url "authors" args)
+    echo -e "\t${url}"
+   
+    # Prepare request to get original data
+    local -A o_args=(
+        [id]="1"
+    )
+    local o_url=$(get_url "authors" o_args)
+   
+    # Save original data
+    local o_response=$(curl -s -X GET -w "\n%{http_code}" "${o_url}")
+    local o_body=$(echo "$o_response" | sed '$d')
+    local o_author=$(echo "$o_body" | jq -r '.author')
+   
+    # Execute update
+    local response=$(curl -s -X PUT -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local author=$(echo "$body" | jq -r '.author')
+
+    # Restore original data
+    local -A r_args=(
+        [id]="1"
+        [author]="${o_author}"
+    )
+    local r_url=$(get_url "authors" r_args)
+    curl -s -X PUT "${r_url}" >>/dev/null
+
+    if [[ "$status" == "200" ]] && [[ "$author" == "Boe Jiden" ]]; then
+        echo -e "\tValid JSON response with correct data"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 200, invalid JSON, or incorrect data"
+        return 1
+    fi
+}
 
 #   - If missing any parameters { message: ‘Missing Required Parameters’ }
+authors_put__422_missing_params() {
+    local url=$(get_url "authors")
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X PUT -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="Missing Required Parameters"
+    
+    if [[ "$status" == "422" ]] && [[ "$message" == "$expected" ]]; then
+        echo -e "\tValid JSON message for 422 response"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 422 or incorrect message"
+        return 1
+    fi
+}
 
 #
 # Delete (DELETE) ............................................................
 #
-#   - /api/authors/ id of deleted author
 
-#   - If no quotes found to delete { message: ‘No Authors Found’ }
+#   - /api/authors/ id of deleted author
+authors_delete__by_id() {
+    local -A o_args=(
+        [author]="foobarbaz"
+    )
+    local o_url=$(get_url "authors" o_args)
+    local o_response=$(curl -s -X POST -w "\n%{http_code}" "${o_url}")
+    local o_body=$(echo "$o_response" | sed '$d')
+    local o_status=$(echo "$o_response" | tail -n1)
+    local o_id=$(echo "$o_body" | jq -r '.id')
+
+    local -A args=(
+        [id]="${o_id}"
+    )
+    local url=$(get_url "authors" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X DELETE -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local id=$(echo "$body" | jq -r '.id')
+    
+    if [[ "$status" == "200" ]] && [[ $id == $o_id ]]; then
+        echo -e "\tValid JSON response with correct id"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 200, invalid JSON, or wrong id returned"
+        return 1
+    fi
+}
+
+#   - If no authors found to delete { message: ‘No Authors Found’ }
+authors_delete__404_none_found() {
+    local -A args=(
+        [id]="42069"  # ID must not exist
+    )
+    local url=$(get_url "authors" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X DELETE -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="No Authors Found"
+    
+    if [[ "$status" == "404" ]] && [[ $message == $expected ]]; then
+        echo -e "\tValid JSON 404 message"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 404, invalid JSON, or wrong message"
+        return 1
+    fi
+}
 
 #   - If missing any parameters { message: ‘Missing Required Parameters’ }
+authors_delete__422_missing_params() {
+    local url=$(get_url "authors")
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X DELETE -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="Missing Required Parameters"
+    
+    if [[ "$status" == "422" ]] && [[ "$message" == "$expected" ]]; then
+        echo -e "\tValid JSON message for 422 response"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 422 or incorrect message"
+        return 1
+    fi
+}
 
 # ============================================================================
 # categories
@@ -575,36 +807,267 @@ quotes_delete__422_missing_params() {
 # D.) All requests for categories should return the id and category fields.
 #
 # Create (POST) ..............................................................
-#   
-#   - /categories/ created category (id, category)
+# 
 
+#   - /categories/ created category (id, category)
+categories_post__valid_fields() {
+    local -A args=(
+        [category]="HTML rUl3z d00d!"
+    )
+    local url=$(get_url "categories" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X POST -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local id=$(echo "$body" | jq -r '.id')
+
+    categories_delete $id >>/dev/null
+
+    fields=("id" "category")
+    
+    if [[ "$status" == "200" ]] && json_has_fields "$body" fields; then
+        echo -e "\tValid JSON for 200 response"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 200, invalid JSON, or missing fields"
+        return 1
+    fi
+}
 #   -If missing any parameters { message: ‘Missing Required Parameters’ }
+categories_post__422_missing_params() {
+    local url=$(get_url "categories")
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X POST -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="Missing Required Parameters"
+    
+    if [[ "$status" == "422" ]] && [[ "$message" == "$expected" ]]; then
+        echo -e "\tValid JSON message for 422 response"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 422 or wrong message"
+        return 1
+    fi
+}
 
 #
 # Read (GET) .................................................................
 #   
 #   - /categories/ All categories with their ids (id, category)
 #     Expect >= 5 items returned in array
+categories_get__all_returned() {
+    local url=$(get_url "categories")
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X GET -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local count=$(echo "$body" | jq 'length')
+    local expected=5
+    
+    if [[ "$status" == "200" ]] && [[ $count -ge $expected ]]; then
+        echo -e "\tValid JSON response with >=5 results"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tCount: ${count}\n\tStatus not 200, invalid JSON, or less than 5 results returned"
+        return 1
+    fi
+}
 
-#   - /categories/?id=7 The specific category with its id
+#   - /categories/?id=3 The specific category with its id
+categories_get__by_id() {
+    local -A args=(
+        [id]="3"
+    )
+    local url=$(get_url "categories" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X GET -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local id=$(echo "$body" | jq -r '.id')
+    local expected=3
+    
+    if [[ "$status" == "200" ]] && [[ $id == $expected ]]; then
+        echo -e "\tValid JSON response with correct id"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 200, invalid JSON, or wrong id returned"
+        return 1
+    fi
+}
 
 #   - If no categories found for routes above { message: ‘category_id Not Found’ }
+categories_get__404_id() {
+    local -A args=(
+        [id]="42069"  # ID must not exist
+    )
+    local url=$(get_url "categories" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X GET -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="category_id Not Found"
+    
+    if [[ "$status" == "404" ]] && [[ $message == $expected ]]; then
+        echo -e "\tValid JSON response with correct message"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 404 or wrong message"
+        return 1
+    fi
+}
 
 #
 # Update (PUT) ...............................................................
 #
+
 #   - /categories/ updated category (id, category)
+categories_put__valid_fields() {
+    local -A args=(
+        [id]="1"
+        [category]="HTML rUl3z d00d!"
+    )
+    local url=$(get_url "categories" args)
+    echo -e "\t${url}"
+   
+    # Prepare request to get original data
+    local -A o_args=(
+        [id]="1"
+    )
+    local o_url=$(get_url "categories" o_args)
+   
+    # Save original data
+    local o_response=$(curl -s -X GET -w "\n%{http_code}" "${o_url}")
+    local o_body=$(echo "$o_response" | sed '$d')
+    local o_category=$(echo "$o_body" | jq -r '.category')
+   
+    # Execute update
+    local response=$(curl -s -X PUT -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local category=$(echo "$body" | jq -r '.category')
+
+    # Restore original data
+    local -A r_args=(
+        [id]="1"
+        [category]="${o_category}"
+    )
+    local r_url=$(get_url "categories" r_args)
+    curl -s -X PUT "${r_url}" >>/dev/null
+
+    if [[ "$status" == "200" ]] && [[ "$category" == "HTML rUl3z d00d!" ]]; then
+        echo -e "\tValid JSON response with correct data"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 200, invalid JSON, or incorrect data"
+        return 1
+    fi
+}
 
 #   - If missing any parameters { message: ‘Missing Required Parameters’ }
+categories_put__422_missing_params() {
+    local url=$(get_url "categories")
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X PUT -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="Missing Required Parameters"
+    
+    if [[ "$status" == "422" ]] && [[ "$message" == "$expected" ]]; then
+        echo -e "\tValid JSON message for 422 response"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 422 or incorrect message"
+        return 1
+    fi
+}
 
 #
 # Delete (DELETE) ............................................................
 #
+
 #   - /api/categories/ id of deleted category
+categories_delete__by_id() {
+    local -A o_args=(
+        [category]="HTML rUl3z d00d!"
+    )
+    local o_url=$(get_url "categories" o_args)
+    local o_response=$(curl -s -X POST -w "\n%{http_code}" "${o_url}")
+    local o_body=$(echo "$o_response" | sed '$d')
+    local o_status=$(echo "$o_response" | tail -n1)
+    local o_id=$(echo "$o_body" | jq -r '.id')
+
+    local -A args=(
+        [id]="${o_id}"
+    )
+    local url=$(get_url "categories" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X DELETE -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local id=$(echo "$body" | jq -r '.id')
+    
+    if [[ "$status" == "200" ]] && [[ $id == $o_id ]]; then
+        echo -e "\tValid JSON response with correct id"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 200, invalid JSON, or wrong id returned"
+        return 1
+    fi
+}
 
 #   - If no quotes found to delete { message: ‘No Categories Found’ }
+categories_delete__404_none_found() {
+    local -A args=(
+        [id]="42069"  # ID must not exist
+    )
+    local url=$(get_url "categories" args)
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X DELETE -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="No Categories Found"
+    
+    if [[ "$status" == "404" ]] && [[ $message == $expected ]]; then
+        echo -e "\tValid JSON 404 message"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tid: ${id}\n\tStatus not 404, invalid JSON, or wrong message"
+        return 1
+    fi
+}
 
 #   - If missing any parameters { message: ‘Missing Required Parameters’ }
+categories_delete__422_missing_params() {
+    local url=$(get_url "categories")
+    echo -e "\t${url}"
+    
+    local response=$(curl -s -X DELETE -w "\n%{http_code}" "${url}")
+    local body=$(echo "$response" | sed '$d')
+    local status=$(echo "$response" | tail -n1)
+    local message=$(echo "$body" | jq -r '.message')
+    local expected="Missing Required Parameters"
+    
+    if [[ "$status" == "422" ]] && [[ "$message" == "$expected" ]]; then
+        echo -e "\tValid JSON message for 422 response"
+        return 0
+    else
+        echo -e "\t${status}\n\t${body}\n\tStatus not 422 or incorrect message"
+        return 1
+    fi
+}
 
 # ============================================================================
 # EXECUTION
@@ -630,11 +1093,31 @@ tests=(
     "quotes_delete__by_id"
     "quotes_delete__404_none_found"
     "quotes_delete__422_missing_params"
+    "authors_post__valid_fields"
+    "authors_post__422_missing_params"
+    "authors_get__all_returned"
+    "authors_get__by_id"
+    "authors_get__404_id"
+    "authors_put__valid_fields"
+    "authors_put__422_missing_params"
+    "authors_delete__by_id"
+    "authors_delete__404_none_found"
+    "authors_delete__422_missing_params"
+    "categories_post__valid_fields"
+    "categories_post__422_missing_params"
+    "categories_get__all_returned"
+    "categories_get__by_id"
+    "categories_get__404_id"
+    "categories_put__valid_fields"
+    "categories_put__422_missing_params"
+    "categories_delete__by_id"
+    "categories_delete__404_none_found"
+    "categories_delete__422_missing_params"
 )
 
 test_keys=(
     "General - Status 500 JSON"
-    "Quotes - POST JSON Fields"
+    "Quotes - POST Valid Fields"
     "Quotes - POST 404 author_id"
     "Quotes - POST 404 category_id"
     "Quotes - POST 422 Missing Parameters"
@@ -652,6 +1135,26 @@ test_keys=(
     "Quotes - DELETE By id"
     "Quotes - DELETE 404 None Found"
     "Quotes - DELETE 422 Missing Parameters"
+    "Authors - POST JSON Fields"
+    "Authors - POST 422 Missing Parameters"
+    "Authors - GET All Returned"
+    "Authors - GET By id"
+    "Authors - GET 404 id"
+    "Authors - PUT Valid Fields"
+    "Authors - PUT 422 Missing Parameters"
+    "Authors - DELETE By id"
+    "Authors - DELETE 404 None Found"
+    "Authors - DELETE 422 Missing Parameters"
+    "Categories - POST JSON Fields"
+    "Categories - POST 422 Missing Parameters"
+    "Categories - GET All Returned"
+    "Categories - GET By id"
+    "Categories - GET 404 id"
+    "Categories - PUT Valid Fields"
+    "Categories - PUT 422 Missing Parameters"
+    "Categories - DELETE By id"
+    "Categories - DELETE 404 None Found"
+    "Categories - DELETE 422 Missing Parameters"
 )
 
 pass_count=0
