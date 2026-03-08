@@ -2,22 +2,33 @@
 require_once'Endpoint.php';
 
 class QuotesEndpoint extends Endpoint {
+    public $required_fields = array(
+        "GET" => [],
+        "HEAD" => [],
+        "POST" => ["quote", "author_id", "category_id"],
+        "PUT" => ["id", "quote", "author_id", "category_id"],
+        "DELETE" => ["id"],
+        "CONNECT" => [],
+        "OPTIONS" => [],
+        "TRACE" => [],
+        "PATH" => []
+    );
     function get($context): Response {
         global $server;
 
-        $id = $context->params["id"];
-        $rnd = $context->params["random"];
+        $id = $context->get_param("id");
+        $rnd = $context->get_param("random");
 
         if (!is_null($id) ||
-            array_key_exists("author_id", $context->params) ||
-            array_key_exists("category_id", $context->params)) {
+            $context->has_params(["author_id"]) ||
+            $context->has_params(["category_id"])) {
             $result = $server->db->prep_query(
                 "quotes",
                 "select",
                 array(
-                    "id" => $context->params["id"],
-                    "author_id" => $context->params["author_id"],
-                    "category_id" => $context->params["category_id"]
+                    "id" => $context->get_param("id"),
+                    "author_id" => $context->get_param("author_id"),
+                    "category_id" => $context->get_param("category_id")
                 )
             );
 
@@ -34,7 +45,7 @@ class QuotesEndpoint extends Endpoint {
                 return new Response(body: json_encode($result));
             }
             
-            return $this->get_message_response(404, "No Quotes Found");
+            return $this->get_message_response(200, "No Quotes Found");
 
         } else {
             $result = $server->db->query("quotes", "select_all");
@@ -51,150 +62,131 @@ class QuotesEndpoint extends Endpoint {
     function post($context): Response {
         global $server;
 
-        if (array_key_exists("quote", $context->params) &&
-            array_key_exists("author_id", $context->params) &&
-            array_key_exists("category_id", $context->params)
-        ) {
-            try {
-                $result = $server->db->prep_query(
-                    "quotes",
-                    "insert",
-                    array(
-                        "quote" => $context->params["quote"],
-                        "author_id" => $context->params["author_id"],
-                        "category_id" => $context->params["category_id"]
-                    )
-                );
-            } catch (Exception $e) {
-                $sub_result = $server->db->prep_query(
-                    "authors",
-                    "select_id",
-                    array(
-                        "id" => $context->params["author_id"]
-                    )
-                );
+        try {
+            $result = $server->db->prep_query(
+                "quotes",
+                "insert",
+                array(
+                    "quote" => $context->get_param("quote"),
+                    "author_id" => $context->get_param("author_id"),
+                    "category_id" => $context->get_param("category_id")
+                )
+            );
+        } catch (Exception $e) {
+            error_log($e->getMessage()); 
 
-                if (count($sub_result) === 0) {
-                    return $this->get_message_response(404, "author_id Not Found");
-                }
+            $sub_result = $server->db->prep_query(
+                "authors",
+                "select_id",
+                array(
+                    "id" => $context->get_param("author_id")
+                )
+            );
 
-                $sub_result = $server->db->prep_query(
-                    "categories",
-                    "select_id",
-                    array(
-                        "id" => $context->params["category_id"]
-                    )
-                );
-
-                if (count($sub_result) === 0) {
-                    return $this->get_message_response(404, "category_id Not Found");
-                }
-                
+            if (count($sub_result) === 0) {
+                return $this->get_message_response(200, "author_id Not Found");
             }
 
-            if (count($result) > 0) {
-                return new Response(body: json_encode($result[0]));
+            $sub_result = $server->db->prep_query(
+                "categories",
+                "select_id",
+                array(
+                    "id" => $context->get_param("category_id")
+                )
+            );
+
+            if (count($sub_result) === 0) {
+                return $this->get_message_response(200, "category_id Not Found");
             }
-
-            return $this->get_message_response(500, "Error while inserting quote");
-
-        } else {
-            return $this->get_message_response(422, "Missing Required Parameters");
+            
         }
+
+        if (count($result) > 0) {
+            return new Response(body: json_encode($result[0]));
+        }
+
+        return $this->get_message_response(500, "Error while inserting quote");
     }
     
     function put($context): Response {
         global $server;
 
-        if (array_key_exists("id", $context->params) &&
-            array_key_exists("quote", $context->params) &&
-            array_key_exists("author_id", $context->params) &&
-            array_key_exists("category_id", $context->params)
-        ) {
-            try {
-                $sub_result = $server->db->prep_query(
-                    "quotes",
-                    "select_id",
-                    array(
-                        "id" => $context->params["id"]
-                    )
-                );
+        try {
+            $sub_result = $server->db->prep_query(
+                "quotes",
+                "select_id",
+                array(
+                    "id" => $context->get_param("id")
+                )
+            );
 
-                if (count($sub_result) === 0) {
-                    return $this->get_message_response(404, "No Quotes Found");
-                }
-
-            } catch (Exception $e) {
-                    return this->get_message_response(500, $e->getMessage());
+            if (count($sub_result) === 0) {
+                return $this->get_message_response(200, "No Quotes Found");
             }
 
-            try {
-                $result = $server->db->prep_query(
-                    "quotes",
-                    "update",
-                    array(
-                        "id" => $context->params["id"],
-                        "quote" => $context->params["quote"],
-                        "author_id" => $context->params["author_id"],
-                        "category_id" => $context->params["category_id"]
-                    )
-                );
-            } catch (Exception $e) {
-
-                $sub_result = $server->db->prep_query(
-                    "authors",
-                    "select_id",
-                    array(
-                        "id" => $context->params["author_id"]
-                    )
-                );
-
-                if (count($sub_result) === 0) {
-                    return $this->get_message_response(404, "author_id Not Found");
-                }
-
-                $sub_result = $server->db->prep_query(
-                    "categories",
-                    "select_id",
-                    array(
-                        "id" => $context->params["category_id"]
-                    )
-                );
-
-                if (count($sub_result) === 0) {
-                    return $this->get_message_response(404, "category_id Not Found");
-                }
-                
-            }
-
-            if (count($result) > 0) {
-                return new Response(body: json_encode($result[0]));
-            }
-
-            return $this->get_message_response(500, "Error while updating quote");
-
-        } else {
-            return $this->get_message_response(422, "Missing Required Parameters");
+        } catch (Exception $e) {
+                return this->get_message_response(200, $e->getMessage());
         }
+
+        try {
+            $result = $server->db->prep_query(
+                "quotes",
+                "update",
+                array(
+                    "id" => $context->get_param("id"),
+                    "quote" => $context->get_param("quote"),
+                    "author_id" => $context->get_param("author_id"),
+                    "category_id" => $context->get_param("category_id")
+                )
+            );
+        } catch (Exception $e) {
+
+            $sub_result = $server->db->prep_query(
+                "authors",
+                "select_id",
+                array(
+                    "id" => $context->get_param("author_id")
+                )
+            );
+
+            if (count($sub_result) === 0) {
+                return $this->get_message_response(200, "author_id Not Found");
+            }
+
+            $sub_result = $server->db->prep_query(
+                "categories",
+                "select_id",
+                array(
+                    "id" => $context->get_param("category_id")
+                )
+            );
+
+            if (count($sub_result) === 0) {
+                return $this->get_message_response(200, "category_id Not Found");
+            }
+            
+        }
+
+        if (count($result) > 0) {
+            return new Response(body: json_encode($result[0]));
+        }
+
+        return $this->get_message_response(500, "Error while updating quote");
     }
 
     function delete($context): Response {
         global $server;
 
-        if (array_key_exists("id", $context->params)) {
-            $result = $server->db->prep_query(
-                "quotes",
-                "delete",
-                array("id" => $context->params["id"])
-            );
+        $result = $server->db->prep_query(
+            "quotes",
+            "delete",
+            array("id" => $context->get_param("id"))
+        );
 
-            if (count($result) > 0) {
-                return new Response(body: json_encode($result[0]));
-            }
-
-            return $this->get_message_response(404, "No Quotes Found");
-        } else {
-            return $this->get_message_response(422, "Missing Required Parameters");
+        if (count($result) > 0) {
+            return new Response(body: json_encode($result[0]));
         }
+
+        return $this->get_message_response(200, "No Quotes Found");
     }
 }

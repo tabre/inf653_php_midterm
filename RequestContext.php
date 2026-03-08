@@ -32,5 +32,25 @@ class RequestContext {
 
         $this->headers = $headers;
     }
-    
+	
+    function get_param($key) {
+        if (isset($this->params[$key])) {
+            return $this->params[$key];
+        }
+
+        if (isset($this->body->$key)) {
+            return $this->body->$key;
+        }
+
+        return null;
+    }
+
+    function has_params($keys) {
+        foreach ($keys as $key) {
+            if ($this->get_param($key) === null) {
+                return false;
+            }
+        }
+        return true;
+    } 
 }

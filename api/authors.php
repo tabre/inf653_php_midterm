@@ -2,21 +2,33 @@
 require_once'Endpoint.php';
 
 class AuthorsEndpoint extends Endpoint {
+    public $required_fields = array(
+        "GET" => [],
+        "HEAD" => [],
+        "POST" => ["author"],
+        "PUT" => ["id", "author"],
+        "DELETE" => ["id"],
+        "CONNECT" => [],
+        "OPTIONS" => [],
+        "TRACE" => [],
+        "PATH" => []
+    );
+
     function get($context): Response {
         global $server;
 
-        if (array_key_exists("id", $context->params)) {
+        if ($context->has_params(["id"])) {
             $result = $server->db->prep_query(
                 "authors",
                 "select_id",
-                array("id" => $context->params["id"])
+                array("id" => $context->get_param("id"))
             );
 
             if (count($result) > 0) {
                 return new Response(body: json_encode($result[0]));
             }
             
-            return $this->get_message_response(404, "author_id Not Found");
+            return $this->get_message_response(200, "author_id Not Found");
 
         } else {
             return new Response(
@@ -28,65 +40,51 @@ class AuthorsEndpoint extends Endpoint {
     function post($context): Response {
         global $server;
 
-        if (array_key_exists("author", $context->params)) {
-            $result = $server->db->prep_query(
-                "authors",
-                "insert",
-                array("author" => $context->params["author"])
-            );
+        $result = $server->db->prep_query(
+            "authors",
+            "insert",
+            array("author" => $context->get_param("author"))
+        );
 
-            if (count($result) > 0) {
-                return new Response(body: json_encode($result[0]));
-            }
-
-            return $this->get_message_response(500, "Error while inserting author");
-        } else {
-            return $this->get_message_response(422, "Missing Required Parameters");
+        if (count($result) > 0) {
+            return new Response(body: json_encode($result[0]));
         }
+
+        return $this->get_message_response(500, "Error while inserting author");
     }
     
     function put($context): Response {
         global $server;
 
-        if (array_key_exists("id", $context->params) &&
-            array_key_exists("author", $context->params)
-        ) {
-            $result = $server->db->prep_query(
-                "authors",
-                "update",
-                array(
-                    "id" => $context->params["id"],
-                    "author" => $context->params["author"]
-                )
-            );
+        $result = $server->db->prep_query(
+            "authors",
+            "update",
+            array(
+                "id" => $context->get_param("id"),
+                "author" => $context->get_param("author")
+            )
+        );
 
-            if (count($result) > 0) {
-                return new Response(body: json_encode($result[0]));
-            }
-
-            return $this->get_message_response(500, "Error while inserting author");
-        } else {
-            return $this->get_message_response(422, "Missing Required Parameters");
+        if (count($result) > 0) {
+            return new Response(body: json_encode($result[0]));
         }
+
+        return $this->get_message_response(500, "Error while inserting author");
     }
     
     function delete($context): Response {
         global $server;
 
-        if (array_key_exists("id", $context->params)) {
-            $result = $server->db->prep_query(
-                "authors",
-                "delete",
-                array("id" => $context->params["id"])
-            );
+        $result = $server->db->prep_query(
+            "authors",
+            "delete",
+            array("id" => $context->get_param("id"))
+        );
 
-            if (count($result) > 0) {
-                return new Response(body: json_encode($result[0]));
-            }
-
-            return $this->get_message_response(404, "No Authors Found");
-        } else {
-            return $this->get_message_response(422, "Missing Required Parameters");
+        if (count($result) > 0) {
+            return new Response(body: json_encode($result[0]));
         }
+
+        return $this->get_message_response(200, "No Authors Found");
     }
 }

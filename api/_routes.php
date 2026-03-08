@@ -6,9 +6,16 @@ require_once('quotes.php');
 
 $d = '/api';
 
+$authors_endpoint = new AuthorsEndpoint();
+$categories_endpoint = new CategoriesEndpoint();
+$quotes_endpoint = new QuotesEndpoint();
+
 $server->register_routes([
-    new Route($d . "/authors", new AuthorsEndpoint()),
-    new Route($d . "/categories", new CategoriesEndpoint()),
-    new Route($d . "/quotes", new QuotesEndpoint()),
+    new Route($d . "/authors", $authors_endpoint),
+    new Route($d . "/authors/", $authors_endpoint),
+    new Route($d . "/categories", $categories_endpoint),
+    new Route($d . "/categories/", $categories_endpoint),
+    new Route($d . "/quotes", $quotes_endpoint),
+    new Route($d . "/quotes/", $quotes_endpoint),
 ])
 ?>

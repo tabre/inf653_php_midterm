@@ -13,11 +13,13 @@ CREATE OR REPLACE FUNCTION quotes_select(
     p_author_id int4 DEFAULT NULL,
     p_category_id int4 DEFAULT NULL
 )
-RETURNS SETOF quotes AS $$
+RETURNS TABLE (id int4, quote varchar(1024), author varchar(255), category varchar(255)) AS $$
 BEGIN
     RETURN QUERY
-    SELECT q.id, q.quote, q.author_id, q.category_id
+    SELECT q.id, q.quote, a.author, c.category
     FROM quotes q
+    LEFT JOIN authors a ON q.author_id = a.id
+    LEFT JOIN categories c ON q.category_id = c.id
     WHERE (p_id IS NULL OR q.id = p_id)
       AND (p_author_id IS NULL OR q.author_id = p_author_id)
       AND (p_category_id IS NULL OR q.category_id = p_category_id);

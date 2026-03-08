@@ -3,7 +3,18 @@ require_once 'Response.php';
 
 class Endpoint {
     public $status_codes;
-    
+    public $required_fields = array(
+        "GET" => [],
+        "HEAD" => [],
+        "POST" => [],
+        "PUT" => [],
+        "DELETE" => [],
+        "CONNECT" => [],
+        "OPTIONS" => [],
+        "TRACE" => [],
+        "PATH" => []
+    );
+ 
     function __construct() {
         $this->status_codes = array(
             100 => "Continue",
@@ -107,7 +118,7 @@ class Endpoint {
     }
 
     function options($context): Response{
-        return $this->get_405_response($context);
+        return $this->get_generic_response(200, "OK");
     }
 
     function trace($context): Response {
@@ -146,48 +157,56 @@ class Endpoint {
         );
     }
 
-    function handle($context): void {
-        try {
-            switch ($context->method) {
-                case "GET":
-                    $response = $this->get($context);
-                    break;
-                case "HEAD":
-                    $response = $this->head($context);
-                    break;
-                case "POST":
-                    $response = $this->post($context);
-                    break;
-                case "PUT":
-                    $response = $this->put($context);
-                    break;
-                case "DELETE":
-                    $response = $this->delete($context);
-                    break;
-                case "CONNECT":
-                    $response = $this->connect($context);
-                    break;
-                case "OPTIONS":
-                    $response = $this->options($context);
-                    break;
-                case "TRACE":
-                    $response = $this->trace($context);
-                    break;
-                case "PATH":
-                    $response = $this->path($context);
-                    break;
-                default:
-                    $response = $this->get_generic_response(
-                        400, "Unrecognized request method: " + $context->method
-                    );
-            }
-        } catch (Exception $e) {
-            $msg = $e->getMessage();
-            error_log($msg);
+    function context_valid($context): bool {
+        return $context->has_params($this->required_fields[$context->method]);
+    }
 
-            $response = $this->get_generic_response(
-                500, "An error occurred during processing: " . $msg
-            );
+    function handle($context): void {
+        if (!$this->context_valid($context)) {
+            $response = $this->get_message_response(200, "Missing Required Parameters"); 
+        } else {
+            try {
+                switch ($context->method) {
+                    case "GET":
+                        $response = $this->get($context);
+                        break;
+                    case "HEAD":
+                        $response = $this->head($context);
+                        break;
+                    case "POST":
+                        $response = $this->post($context);
+                        break;
+                    case "PUT":
+                        $response = $this->put($context);
+                        break;
+                    case "DELETE":
+                        $response = $this->delete($context);
+                        break;
+                    case "CONNECT":
+                        $response = $this->connect($context);
+                        break;
+                    case "OPTIONS":
+                        $response = $this->options($context);
+                        break;
+                    case "TRACE":
+                        $response = $this->trace($context);
+                        break;
+                    case "PATH":
+                        $response = $this->path($context);
+                        break;
+                    default:
+                        $response = $this->get_generic_response(
+                            400, "Unrecognized request method: " + $context->method
+                        );
+                }
+            } catch (Exception $e) {
+                $msg = $e->getMessage();
+                error_log($msg);
+
+                $response = $this->get_generic_response(
+                    500, "An error occurred during processing: " . $msg
+                );
+            }
         }
         
         http_response_code($response->status_code);

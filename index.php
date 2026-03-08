@@ -7,6 +7,10 @@ $uri = $_SERVER['REQUEST_URI'];
 $method = $_SERVER['REQUEST_METHOD'];
 
 header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: https://happy-kilby-f831bf.netlify.app');
+header('Access-Control-Allow-Methods: POST, GET, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Credentials: true');
 
 function exception_handler($throwable) {
     global $content, $server;
